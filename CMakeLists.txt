@@ -1,14 +1,28 @@
 cmake_minimum_required(VERSION 3.16)
 project(TrackerGeoSim LANGUAGES CXX)
 
+# ---- C++ standard -----------------------------------------------------------
+# Set globally BEFORE find_package calls so nothing can override it.
+# Also set CXX_EXTENSIONS OFF to avoid -std=gnu++20 vs -std=c++20 mismatches.
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ---- Dependencies ------------------------------------------------------------
 find_package(GeoModelCore REQUIRED)
 find_package(GeoModelG4   REQUIRED)
 find_package(Geant4 REQUIRED ui_all vis_all)
 include(${Geant4_USE_FILE})
+
+find_package(ROOT REQUIRED COMPONENTS Core RIO Tree)
+include(${ROOT_USE_FILE})
+
+# Geant4_USE_FILE and ROOT_USE_FILE can inject their own -std flags via
+# add_compile_options / CMAKE_CXX_FLAGS.  Re-assert C++20 after both includes
+# so it wins in all compile-flag lists.
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ---- Tracker geometry library -----------------------------------------------
 add_library(TrackerGeo STATIC
@@ -18,6 +32,7 @@ add_library(TrackerGeo STATIC
 target_include_directories(TrackerGeo PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_compile_features(TrackerGeo PUBLIC cxx_std_20)
 target_link_libraries(TrackerGeo PUBLIC
   GeoModelCore::GeoModelKernel
 )
@@ -26,22 +41,29 @@ target_link_libraries(TrackerGeo PUBLIC
 add_executable(run_tracker
   exec/main_g4.cpp
   src/TrackerDetectorConstruction.cc
+  src/TrackerSD.cc
+  src/TrackerHit.cc
+  src/TrackerRunAction.cc
+  src/TrackerEventAction.cc
+  src/TrackerPrimaryGeneratorAction.cc
 )
 target_include_directories(run_tracker PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_compile_features(run_tracker PRIVATE cxx_std_20)
 target_link_libraries(run_tracker PRIVATE
   TrackerGeo
   ${Geant4_LIBRARIES}
+  ROOT::Core ROOT::RIO ROOT::Tree
 )
 
-# GeoModel -> Geant4 bridge (target name varies across GeoModelG4 versions)
+# GeoModel -> Geant4 bridge
 if (TARGET GeoModelG4::GeoModel2G4)
   target_link_libraries(run_tracker PRIVATE GeoModelG4::GeoModel2G4)
 elseif (TARGET GeoModel2G4)
   target_link_libraries(run_tracker PRIVATE GeoModel2G4)
 else()
-  message(FATAL_ERROR "GeoModel2G4 target not found. Check GeoModelG4Config.cmake")
+  message(FATAL_ERROR "GeoModel2G4 target not found.")
 endif()
 
 if (TARGET GeoModelG4::GeoMaterial2G4)
@@ -50,7 +72,7 @@ elseif (TARGET GeoMaterial2G4)
   target_link_libraries(run_tracker PRIVATE GeoMaterial2G4)
 endif()
 
-# ---- Copy vis macro to build directory so it is found at runtime ------------
+# Copy vis macro to build directory
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/tracker_vis.mac
   ${CMAKE_CURRENT_BINARY_DIR}/tracker_vis.mac

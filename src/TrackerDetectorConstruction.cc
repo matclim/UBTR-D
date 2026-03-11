@@ -21,6 +21,9 @@
 #include "G4Colour.hh"
 #include "G4SystemOfUnits.hh"
 
+#include "TrackerSD.hh"
+#include "G4SDManager.hh"
+
 // GDML export
 #include "G4GDMLParser.hh"
 #include "G4Threading.hh"
@@ -88,7 +91,26 @@ G4VPhysicalVolume* TrackerDetectorConstruction::Construct()
            << "  LVStore size = "
            << G4LogicalVolumeStore::GetInstance()->size() << G4endl;
 
-    // 3. Visualisation attributes
+    // 3. Sensitive detector registration
+    if (m_registerSD) {
+        auto* sdman = G4SDManager::GetSDMpointer();
+        auto* trackerSD = new TrackerSD("TrackerSD");
+        sdman->AddNewDetector(trackerSD);
+
+        int nSD = 0;
+        for (auto* lv : *G4LogicalVolumeStore::GetInstance()) {
+            const std::string& n = lv->GetName();
+            if (n.find("TubeGas_LV") != std::string::npos ||
+                n.find("Tile_LV")    != std::string::npos) {
+                lv->SetSensitiveDetector(trackerSD);
+                ++nSD;
+            }
+        }
+        G4cout << "[TrackerDetectorConstruction] Sensitive LVs registered: "
+               << nSD << G4endl;
+    }
+
+    // 4. Visualisation attributes
     auto* store = G4LogicalVolumeStore::GetInstance();
 
     auto makeVis = [](double r, double g, double b, double a,

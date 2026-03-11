@@ -3,21 +3,7 @@
 #include "G4VUserDetectorConstruction.hh"
 #include <string>
 
-// Forward declarations
 class GeoPhysVol;
-
-// ============================================================================
-//  TrackerDetectorConstruction
-//
-//  Minimal Geant4 detector construction for the 2×3 m² tracker plane.
-//  Intended for standalone visualisation and GDML export only —
-//  no sensitive detectors or hit collections are registered.
-//
-//  Usage (from main_g4.cpp when --tracker-only flag is set):
-//      auto* det = new TrackerDetectorConstruction(write_gdml);
-//      det->SetVisMode(visMode);
-//      runManager->SetUserInitialization(det);
-// ============================================================================
 
 class TrackerDetectorConstruction : public G4VUserDetectorConstruction {
 public:
@@ -26,11 +12,13 @@ public:
 
     G4VPhysicalVolume* Construct() override;
 
-    void SetVisMode(int mode) { m_visMode = mode; }
+    void SetVisMode(int mode)   { m_visMode    = mode; }
+    void SetRegisterSD(bool on) { m_registerSD = on;   }
 
 private:
-    bool m_writeGdml;
-    int  m_visMode = 1;   // default: colour by region
+    bool m_writeGdml  = false;
+    int  m_visMode    = 1;      // 0=envelopes only  1=by-region  2=full detail
+    bool m_registerSD = false;  // false for vis-only, true for simulation
 
     GeoPhysVol* buildGeoModelWorld();
 };

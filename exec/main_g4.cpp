@@ -4,38 +4,16 @@
 #include "G4VisExecutive.hh"
 #include "G4PhysListFactory.hh"
 #include "G4SystemOfUnits.hh"
+#include "Randomize.hh"
 
 #include "TrackerDetectorConstruction.hh"
-
-// Minimal primary generator (required by Geant4 even when firing zero events)
-#include "G4VUserPrimaryGeneratorAction.hh"
-#include "G4ParticleGun.hh"
-#include "G4ParticleTable.hh"
+#include "TrackerPrimaryGeneratorAction.hh"
+#include "TrackerRunAction.hh"
+#include "TrackerEventAction.hh"
 
 #include <string>
 #include <iostream>
 #include <cstdlib>
-
-// ============================================================================
-//  NullPrimaryGenerator
-//  Fires a single geantino that misses the detector; satisfies the Geant4
-//  requirement for a registered primary generator without affecting geometry.
-// ============================================================================
-class NullPrimaryGenerator : public G4VUserPrimaryGeneratorAction {
-public:
-    NullPrimaryGenerator() {
-        m_gun = new G4ParticleGun(1);
-        auto* pt = G4ParticleTable::GetParticleTable();
-        m_gun->SetParticleDefinition(pt->FindParticle("geantino"));
-        m_gun->SetParticleEnergy(1.0 * GeV);
-        m_gun->SetParticleMomentumDirection({0, 0, 1});
-        m_gun->SetParticlePosition({0, 0, -10000.0 * mm});
-    }
-    ~NullPrimaryGenerator() override { delete m_gun; }
-    void GeneratePrimaries(G4Event* ev) override { m_gun->GeneratePrimaryVertex(ev); }
-private:
-    G4ParticleGun* m_gun;
-};
 
 // ============================================================================
 //  main
@@ -43,66 +21,116 @@ private:
 //  Usage:
 //    ./run_tracker [options]
 //
-//  Options:
-//    --write-gdml            Export geometry to GDML (default filename: tracker_geometry.gdml)
-//    --gdml-out <path>       Override GDML output filename
+//  Geometry / output:
+//    --output <file>         ROOT output filename          (default: tracker_hits.root)
+//    --write-gdml            Export geometry to GDML
+//    --gdml-out <file>       GDML output filename          (default: tracker_geometry.gdml)
+//
+//  Run control:
+//    --n-events <N>          Number of events to simulate  (default: 0 = vis only)
+//    --seed <N>              Random seed
+//
+//  Primary particle:
+//    --particle <name>       Geant4 particle name          (default: mu-)
+//    --energy-MeV <E>        Kinetic energy [MeV]          (default: 1000)
+//    --pos-mm <x> <y> <z>    Gun position [mm]             (default: 0 0 -15)
+//    --dir <x> <y> <z>       Direction (unit vector)       (default: 0 0 1)
+//    --sigma-xy-mm <s>       Gaussian beam spread [mm]     (default: 0)
+//
+//  Visualisation:
 //    --visualize             Open interactive viewer
-//    --vis-macro <path>      Vis macro to execute (default: tracker_vis.mac)
-//    --vis-mode <N>          0=envelopes only  1=colour by region (default)  2=full detail
+//    --vis-macro <file>      Vis macro                     (default: tracker_vis.mac)
+//    --vis-mode <0|1|2>      0=envelopes 1=by-region 2=full detail
 // ============================================================================
+
 int main(int argc, char** argv)
 {
-    bool        writeGdml   = false;
-    bool        doVisualize = false;
-    int         visMode     = 1;
-    std::string visMacro    = "tracker_vis.mac";
-    std::string gdmlOut     = "tracker_geometry.gdml";
+    // ---- Defaults -----------------------------------------------------------
+    std::string outFile    = "tracker_hits.root";
+    bool        writeGdml  = false;
+    std::string gdmlOut    = "tracker_geometry.gdml";
+    int         nEvents    = 0;
+    long        seed       = 0;
+    bool        doVis      = false;
+    std::string visMacro   = "tracker_vis.mac";
+    int         visMode    = 1;
 
+    TrackerGunConfig gun;   // particle, energy, pos, dir, sigma
+
+    // ---- Argument parsing ---------------------------------------------------
     auto require = [&](int& i, const char* opt) -> const char* {
         if (i + 1 >= argc) {
-            std::cerr << "Missing value after " << opt << "\n";
-            std::exit(2);
+            std::cerr << "Missing value after " << opt << "\n"; std::exit(2);
         }
         return argv[++i];
+    };
+    auto require3 = [&](int& i, const char* opt, double& a, double& b, double& c) {
+        if (i + 3 >= argc) {
+            std::cerr << "Missing 3 values after " << opt << "\n"; std::exit(2);
+        }
+        a = std::stod(argv[++i]);
+        b = std::stod(argv[++i]);
+        c = std::stod(argv[++i]);
     };
 
     for (int i = 1; i < argc; ++i) {
         const std::string opt = argv[i];
-        if      (opt == "--write-gdml") { writeGdml   = true; }
-        else if (opt == "--visualize")  { doVisualize = true; }
-        else if (opt == "--vis-mode")   { visMode  = std::stoi(require(i, "--vis-mode")); }
-        else if (opt == "--vis-macro")  { visMacro = require(i, "--vis-macro"); }
-        else if (opt == "--gdml-out")   { gdmlOut  = require(i, "--gdml-out"); }
+        if      (opt == "--output")       outFile          = require(i, "--output");
+        else if (opt == "--write-gdml")   writeGdml        = true;
+        else if (opt == "--gdml-out")     gdmlOut          = require(i, "--gdml-out");
+        else if (opt == "--n-events")     nEvents          = std::stoi(require(i, "--n-events"));
+        else if (opt == "--seed")         seed             = std::stol(require(i, "--seed"));
+        else if (opt == "--particle")     gun.particle     = require(i, "--particle");
+        else if (opt == "--energy-MeV")   gun.energy_MeV   = std::stod(require(i, "--energy-MeV"));
+        else if (opt == "--sigma-xy-mm")  gun.sigma_xy_mm  = std::stod(require(i, "--sigma-xy-mm"));
+        else if (opt == "--visualize")    doVis            = true;
+        else if (opt == "--vis-macro")    visMacro         = require(i, "--vis-macro");
+        else if (opt == "--vis-mode")     visMode          = std::stoi(require(i, "--vis-mode"));
+        else if (opt == "--pos-mm") {
+            double x, y, z;
+            require3(i, "--pos-mm", x, y, z);
+            gun.position = {x, y, z};
+        }
+        else if (opt == "--dir") {
+            double x, y, z;
+            require3(i, "--dir", x, y, z);
+            gun.direction = {x, y, z};
+        }
         else {
             std::cerr << "Unknown option: " << opt << "\n"
-                      << "Usage: run_tracker [--write-gdml] [--gdml-out path]\n"
-                      << "                   [--visualize] [--vis-macro path]\n"
-                      << "                   [--vis-mode 0|1|2]\n";
+                      << "Run ./run_tracker --help for usage.\n";
             std::exit(2);
         }
     }
 
-    // Propagate GDML path via environment (picked up in TrackerDetectorConstruction)
-    if (writeGdml) {
-        setenv("G4_GDML_OUT", gdmlOut.c_str(), /*overwrite=*/1);
-    }
+    if (seed != 0) CLHEP::HepRandom::setTheSeed(seed);
+    if (writeGdml) setenv("G4_GDML_OUT", gdmlOut.c_str(), 1);
 
-    // --- Geant4 setup --------------------------------------------------------
+    // ---- Geant4 setup -------------------------------------------------------
     auto* runManager = new G4RunManager;
 
+    // Detector
     auto* detCon = new TrackerDetectorConstruction(writeGdml);
     detCon->SetVisMode(visMode);
+    detCon->SetRegisterSD(nEvents > 0);   // only register SD when actually simulating
     runManager->SetUserInitialization(detCon);
 
+    // Physics
     G4PhysListFactory factory;
     runManager->SetUserInitialization(factory.GetReferencePhysList("FTFP_BERT"));
-    runManager->SetUserAction(new NullPrimaryGenerator);
+
+    // User actions
+    auto* runAction   = new TrackerRunAction(outFile);
+    auto* eventAction = new TrackerEventAction(runAction);
+    runManager->SetUserAction(new TrackerPrimaryGeneratorAction(gun));
+    runManager->SetUserAction(runAction);
+    runManager->SetUserAction(eventAction);
 
     runManager->Initialize();
 
-    // --- Visualisation -------------------------------------------------------
+    // ---- Visualisation ------------------------------------------------------
     G4VisExecutive* vis = nullptr;
-    if (doVisualize) {
+    if (doVis) {
         vis = new G4VisExecutive;
         vis->Initialize();
 
@@ -116,6 +144,12 @@ int main(int argc, char** argv)
 
         delete app;
         delete vis;
+    }
+
+    // ---- Run simulation -----------------------------------------------------
+    if (nEvents > 0) {
+        auto* UI = G4UImanager::GetUIpointer();
+        UI->ApplyCommand("/run/beamOn " + std::to_string(nEvents));
     }
 
     delete runManager;
