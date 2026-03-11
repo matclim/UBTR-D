@@ -6,10 +6,10 @@
 #include "G4SystemOfUnits.hh"
 #include "Randomize.hh"
 
-#include "TrackerDetectorConstruction.hh"
-#include "TrackerPrimaryGeneratorAction.hh"
-#include "TrackerRunAction.hh"
-#include "TrackerEventAction.hh"
+#include "UBTDetectorConstruction.hh"
+#include "UBTPrimaryGeneratorAction.hh"
+#include "UBTRunAction.hh"
+#include "UBTEventAction.hh"
 
 #include <string>
 #include <iostream>
@@ -19,12 +19,12 @@
 //  main
 //
 //  Usage:
-//    ./run_tracker [options]
+//    ./run_ubt [options]
 //
 //  Geometry / output:
-//    --output <file>         ROOT output filename          (default: tracker_hits.root)
+//    --output <file>         ROOT output filename          (default: ubt_hits.root)
 //    --write-gdml            Export geometry to GDML
-//    --gdml-out <file>       GDML output filename          (default: tracker_geometry.gdml)
+//    --gdml-out <file>       GDML output filename          (default: ubt_geometry.gdml)
 //
 //  Run control:
 //    --n-events <N>          Number of events to simulate  (default: 0 = vis only)
@@ -39,23 +39,23 @@
 //
 //  Visualisation:
 //    --visualize             Open interactive viewer
-//    --vis-macro <file>      Vis macro                     (default: tracker_vis.mac)
+//    --vis-macro <file>      Vis macro                     (default: ubt_vis.mac)
 //    --vis-mode <0|1|2>      0=envelopes 1=by-region 2=full detail
 // ============================================================================
 
 int main(int argc, char** argv)
 {
     // ---- Defaults -----------------------------------------------------------
-    std::string outFile    = "tracker_hits.root";
+    std::string outFile    = "ubt_hits.root";
     bool        writeGdml  = false;
-    std::string gdmlOut    = "tracker_geometry.gdml";
+    std::string gdmlOut    = "ubt_geometry.gdml";
     int         nEvents    = 0;
     long        seed       = 0;
     bool        doVis      = false;
-    std::string visMacro   = "tracker_vis.mac";
+    std::string visMacro   = "ubt_vis.mac";
     int         visMode    = 1;
 
-    TrackerGunConfig gun;   // particle, energy, pos, dir, sigma
+    UBTGunConfig gun;   // particle, energy, pos, dir, sigma
 
     // ---- Argument parsing ---------------------------------------------------
     auto require = [&](int& i, const char* opt) -> const char* {
@@ -98,7 +98,7 @@ int main(int argc, char** argv)
         }
         else {
             std::cerr << "Unknown option: " << opt << "\n"
-                      << "Run ./run_tracker --help for usage.\n";
+                      << "Run ./run_ubt --help for usage.\n";
             std::exit(2);
         }
     }
@@ -110,7 +110,7 @@ int main(int argc, char** argv)
     auto* runManager = new G4RunManager;
 
     // Detector
-    auto* detCon = new TrackerDetectorConstruction(writeGdml);
+    auto* detCon = new UBTDetectorConstruction(writeGdml);
     detCon->SetVisMode(visMode);
     detCon->SetRegisterSD(nEvents > 0);   // only register SD when actually simulating
     runManager->SetUserInitialization(detCon);
@@ -121,9 +121,9 @@ int main(int argc, char** argv)
 
     // User actions
     // EventStore is owned by detCon; wire it into EventAction before Initialize()
-    auto* runAction   = new TrackerRunAction(outFile);
-    auto* eventAction = new TrackerEventAction(detCon->GetStore());
-    runManager->SetUserAction(new TrackerPrimaryGeneratorAction(gun));
+    auto* runAction   = new UBTRunAction(outFile);
+    auto* eventAction = new UBTEventAction(detCon->GetStore());
+    runManager->SetUserAction(new UBTPrimaryGeneratorAction(gun));
     runManager->SetUserAction(runAction);
     runManager->SetUserAction(eventAction);
 

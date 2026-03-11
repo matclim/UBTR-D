@@ -1,4 +1,4 @@
-#include "TrackerPrimaryGeneratorAction.hh"
+#include "UBTPrimaryGeneratorAction.hh"
 
 #include "G4ParticleGun.hh"
 #include "G4ParticleTable.hh"
@@ -6,8 +6,8 @@
 #include "G4Event.hh"
 #include "Randomize.hh"
 
-TrackerPrimaryGeneratorAction::TrackerPrimaryGeneratorAction(
-        const TrackerGunConfig& cfg)
+UBTPrimaryGeneratorAction::UBTPrimaryGeneratorAction(
+        const UBTGunConfig& cfg)
     : fCfg(cfg)
 {
     fGun = new G4ParticleGun(1);
@@ -15,7 +15,7 @@ TrackerPrimaryGeneratorAction::TrackerPrimaryGeneratorAction(
     auto* pt  = G4ParticleTable::GetParticleTable();
     auto* def = pt->FindParticle(cfg.particle);
     if (!def) {
-        G4cerr << "[TrackerPrimaryGeneratorAction] Unknown particle '"
+        G4cerr << "[UBTPrimaryGeneratorAction] Unknown particle '"
                << cfg.particle << "', falling back to mu-\n";
         def = pt->FindParticle("mu-");
     }
@@ -26,12 +26,12 @@ TrackerPrimaryGeneratorAction::TrackerPrimaryGeneratorAction(
     fGun->SetParticlePosition(cfg.position * mm);
 }
 
-TrackerPrimaryGeneratorAction::~TrackerPrimaryGeneratorAction()
+UBTPrimaryGeneratorAction::~UBTPrimaryGeneratorAction()
 {
     delete fGun;
 }
 
-void TrackerPrimaryGeneratorAction::GeneratePrimaries(G4Event* event)
+void UBTPrimaryGeneratorAction::GeneratePrimaries(G4Event* event)
 {
     G4ThreeVector pos = fCfg.position * mm;
 

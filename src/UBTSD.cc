@@ -1,5 +1,5 @@
-#include "TrackerSD.hh"
-#include "TrackerEventStore.hh"
+#include "UBTSD.hh"
+#include "UBTEventStore.hh"
 
 #include "G4Step.hh"
 #include "G4StepPoint.hh"
@@ -43,18 +43,18 @@ static std::string touchableKey(int trackID,
     return oss.str();
 }
 
-TrackerSD::TrackerSD(const G4String& name, TrackerEventStore* store)
+UBTSD::UBTSD(const G4String& name, UBTEventStore* store)
     : G4VSensitiveDetector(name), fStore(store)
 {}
 
-void TrackerSD::Initialize(G4HCofThisEvent*)
+void UBTSD::Initialize(G4HCofThisEvent*)
 {
     fMap.clear();
     s_firstTube = true;
     s_firstTile = true;
 }
 
-G4bool TrackerSD::ProcessHits(G4Step* step, G4TouchableHistory*)
+G4bool UBTSD::ProcessHits(G4Step* step, G4TouchableHistory*)
 {
     const G4StepPoint*   pre    = step->GetPreStepPoint();
     const G4StepPoint*   post   = step->GetPostStepPoint();
@@ -73,7 +73,7 @@ G4bool TrackerSD::ProcessHits(G4Step* step, G4TouchableHistory*)
         const std::string key = touchableKey(step->GetTrack()->GetTrackID(), touch);
 
         if (s_firstTube.exchange(false)) {
-            G4cout << "[TrackerSD] First tube step:"
+            G4cout << "[UBTSD] First tube step:"
                    << " LV="   << lvName
                    << " PV="   << pv->GetName()
                    << " key="  << key
@@ -106,7 +106,7 @@ G4bool TrackerSD::ProcessHits(G4Step* step, G4TouchableHistory*)
         const std::string key = touchableKey(step->GetTrack()->GetTrackID(), touch);
 
         if (s_firstTile.exchange(false)) {
-            G4cout << "[TrackerSD] First tile step:"
+            G4cout << "[UBTSD] First tile step:"
                    << " LV="   << lvName
                    << " PV="   << pv->GetName()
                    << " key="  << key
@@ -128,7 +128,7 @@ G4bool TrackerSD::ProcessHits(G4Step* step, G4TouchableHistory*)
     return false;
 }
 
-void TrackerSD::EndOfEvent(G4HCofThisEvent*)
+void UBTSD::EndOfEvent(G4HCofThisEvent*)
 {
     int nTube = 0, nTile = 0;
 
@@ -149,12 +149,12 @@ void TrackerSD::EndOfEvent(G4HCofThisEvent*)
         }
     }
 
-    G4cout << "[TrackerSD] EndOfEvent: tube hits=" << nTube
+    G4cout << "[UBTSD] EndOfEvent: tube hits=" << nTube
            << "  tile hits=" << nTile
            << "  map entries=" << fMap.size() << G4endl;
 }
 
-int TrackerSD::regionCode(const std::string& lvName)
+int UBTSD::regionCode(const std::string& lvName)
 {
     if (lvName.find("CentralTubes") != std::string::npos) return 0;
     if (lvName.find("Top_Left")     != std::string::npos) return 1;
@@ -164,7 +164,7 @@ int TrackerSD::regionCode(const std::string& lvName)
     return -1;
 }
 
-bool TrackerSD::parseTilePVName(const std::string& name,
+bool UBTSD::parseTilePVName(const std::string& name,
                                 int& ix, int& iy, int& sector)
 {
     if      (name.find("TileLeft")  != std::string::npos) sector = -1;

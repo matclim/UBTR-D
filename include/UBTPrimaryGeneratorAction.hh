@@ -6,7 +6,7 @@
 class G4ParticleGun;
 class G4Event;
 
-struct TrackerGunConfig {
+struct UBTGunConfig {
     std::string particle    = "mu-";
     double      energy_MeV  = 1000.0;    // 1 GeV muon by default
     G4ThreeVector position  = {0, 0, -15.0};  // mm, just upstream
@@ -15,13 +15,13 @@ struct TrackerGunConfig {
     long   seed             = 0;
 };
 
-class TrackerPrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction {
+class UBTPrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction {
 public:
-    explicit TrackerPrimaryGeneratorAction(const TrackerGunConfig& cfg);
-    ~TrackerPrimaryGeneratorAction() override;
+    explicit UBTPrimaryGeneratorAction(const UBTGunConfig& cfg);
+    ~UBTPrimaryGeneratorAction() override;
     void GeneratePrimaries(G4Event*) override;
 
 private:
     G4ParticleGun*   fGun;
-    TrackerGunConfig fCfg;
+    UBTGunConfig fCfg;
 };

@@ -4,13 +4,13 @@
 #include <unordered_map>
 #include <string>
 
-class TrackerEventStore;
+class UBTEventStore;
 class G4Step;
 class G4HCofThisEvent;
 class G4TouchableHistory;
 
 // Per-volume aggregator — mirrors CaloSD's HitAgg
-struct TrackerHitAgg {
+struct UBTHitAgg {
     int    trackID  = -1;
     double edep     = 0.0;
     bool   isTube   = false;
@@ -29,22 +29,22 @@ struct TrackerHitAgg {
 };
 
 // ============================================================================
-//  TrackerSD
+//  UBTSD
 //  Aggregates steps by pvName (stable key even for shared LVs) exactly as
-//  CaloSD does. Pushes completed hits into TrackerEventStore in EndOfEvent.
+//  CaloSD does. Pushes completed hits into UBTEventStore in EndOfEvent.
 // ============================================================================
-class TrackerSD : public G4VSensitiveDetector {
+class UBTSD : public G4VSensitiveDetector {
 public:
-    TrackerSD(const G4String& name, TrackerEventStore* store);
-    ~TrackerSD() override = default;
+    UBTSD(const G4String& name, UBTEventStore* store);
+    ~UBTSD() override = default;
 
     void   Initialize(G4HCofThisEvent*) override;
     G4bool ProcessHits(G4Step*, G4TouchableHistory*) override;
     void   EndOfEvent(G4HCofThisEvent*) override;
 
 private:
-    TrackerEventStore* fStore = nullptr;
-    std::unordered_map<std::string, TrackerHitAgg> fMap;
+    UBTEventStore* fStore = nullptr;
+    std::unordered_map<std::string, UBTHitAgg> fMap;
 
     static int  regionCode(const std::string& lvName);
     static bool parseTilePVName(const std::string& pvName,

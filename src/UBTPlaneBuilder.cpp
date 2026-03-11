@@ -1,7 +1,7 @@
 // ============================================================================
-//  TrackerPlaneBuilder.cpp
+//  UBTPlaneBuilder.cpp
 //
-//  2×3 m² tracker plane. All coordinates in mm; origin at plane centre.
+//  2×3 m² ubt plane. All coordinates in mm; origin at plane centre.
 //
 //  Layout (view along +Z / beam):
 //
@@ -38,7 +38,7 @@
 //  Tubes run along X. GeoTube default axis is Z → rotated 90° around Y.
 // ============================================================================
 
-#include "TrackerPlaneBuilder.h"
+#include "UBTPlaneBuilder.h"
 #include "MaterialManager.h"
 
 #include "GeoModelKernel/GeoBox.h"
@@ -215,9 +215,9 @@ void placeDoubleStaggeredLayer(GeoVPhysVol*       envelope,
 
 
 // ============================================================================
-//  TrackerPlaneBuilder::build
+//  UBTPlaneBuilder::build
 // ============================================================================
-void TrackerPlaneBuilder::build(GeoVPhysVol*      mother,
+void UBTPlaneBuilder::build(GeoVPhysVol*      mother,
                                 MaterialManager&  MM,
                                 double            zOffset_mm,
                                 const std::string& tag)

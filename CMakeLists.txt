@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(TrackerGeoSim LANGUAGES CXX)
+project(UBTGeoSim LANGUAGES CXX)
 
 # ---- C++ standard -----------------------------------------------------------
 # Set globally BEFORE find_package calls so nothing can override it.
@@ -24,57 +24,57 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# ---- Tracker geometry library -----------------------------------------------
-add_library(TrackerGeo STATIC
-  src/TrackerPlaneBuilder.cpp
+# ---- UBT geometry library -----------------------------------------------
+add_library(UBTGeo STATIC
+  src/UBTPlaneBuilder.cpp
   src/MaterialManager.cpp
 )
-target_include_directories(TrackerGeo PUBLIC
+target_include_directories(UBTGeo PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_compile_features(TrackerGeo PUBLIC cxx_std_20)
-target_link_libraries(TrackerGeo PUBLIC
+target_compile_features(UBTGeo PUBLIC cxx_std_20)
+target_link_libraries(UBTGeo PUBLIC
   GeoModelCore::GeoModelKernel
 )
 
 # ---- Geant4 simulation executable -------------------------------------------
-add_executable(run_tracker
+add_executable(run_ubt
   exec/main_g4.cpp
-  src/TrackerDetectorConstruction.cc
-  src/TrackerSD.cc
-  src/TrackerHit.cc
-  src/TrackerRunAction.cc
-  src/TrackerEventAction.cc
-  src/TrackerPrimaryGeneratorAction.cc
+  src/UBTDetectorConstruction.cc
+  src/UBTSD.cc
+  src/UBTHit.cc
+  src/UBTRunAction.cc
+  src/UBTEventAction.cc
+  src/UBTPrimaryGeneratorAction.cc
 )
-target_include_directories(run_tracker PRIVATE
+target_include_directories(run_ubt PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-target_compile_features(run_tracker PRIVATE cxx_std_20)
-target_link_libraries(run_tracker PRIVATE
-  TrackerGeo
+target_compile_features(run_ubt PRIVATE cxx_std_20)
+target_link_libraries(run_ubt PRIVATE
+  UBTGeo
   ${Geant4_LIBRARIES}
   ROOT::Core ROOT::RIO ROOT::Tree
 )
 
 # GeoModel -> Geant4 bridge
 if (TARGET GeoModelG4::GeoModel2G4)
-  target_link_libraries(run_tracker PRIVATE GeoModelG4::GeoModel2G4)
+  target_link_libraries(run_ubt PRIVATE GeoModelG4::GeoModel2G4)
 elseif (TARGET GeoModel2G4)
-  target_link_libraries(run_tracker PRIVATE GeoModel2G4)
+  target_link_libraries(run_ubt PRIVATE GeoModel2G4)
 else()
   message(FATAL_ERROR "GeoModel2G4 target not found.")
 endif()
 
 if (TARGET GeoModelG4::GeoMaterial2G4)
-  target_link_libraries(run_tracker PRIVATE GeoModelG4::GeoMaterial2G4)
+  target_link_libraries(run_ubt PRIVATE GeoModelG4::GeoMaterial2G4)
 elseif (TARGET GeoMaterial2G4)
-  target_link_libraries(run_tracker PRIVATE GeoMaterial2G4)
+  target_link_libraries(run_ubt PRIVATE GeoMaterial2G4)
 endif()
 
 # Copy vis macro to build directory
 configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/tracker_vis.mac
-  ${CMAKE_CURRENT_BINARY_DIR}/tracker_vis.mac
+  ${CMAKE_CURRENT_SOURCE_DIR}/ubt_vis.mac
+  ${CMAKE_CURRENT_BINARY_DIR}/ubt_vis.mac
   COPYONLY
 )

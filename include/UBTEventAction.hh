@@ -1,20 +1,20 @@
 #pragma once
 #include "G4UserEventAction.hh"
-#include "TrackerEventStore.hh"
+#include "UBTEventStore.hh"
 
 // ============================================================================
-//  TrackerEventAction
+//  UBTEventAction
 //  Creates the G4AnalysisManager ntuple (once, at construction).
 //  BeginOfEventAction clears the store; EndOfEventAction calls AddNtupleRow.
 // ============================================================================
-class TrackerEventAction : public G4UserEventAction {
+class UBTEventAction : public G4UserEventAction {
 public:
-    explicit TrackerEventAction(TrackerEventStore* store);
-    ~TrackerEventAction() override = default;
+    explicit UBTEventAction(UBTEventStore* store);
+    ~UBTEventAction() override = default;
 
     void BeginOfEventAction(const G4Event*) override;
     void EndOfEventAction  (const G4Event*) override;
 
 private:
-    TrackerEventStore* fStore = nullptr;
+    UBTEventStore* fStore = nullptr;
 };

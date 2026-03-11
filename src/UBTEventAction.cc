@@ -1,13 +1,13 @@
-#include "TrackerEventAction.hh"
+#include "UBTEventAction.hh"
 #include "G4AnalysisManager.hh"
 #include "G4Event.hh"
 
-TrackerEventAction::TrackerEventAction(TrackerEventStore* store)
+UBTEventAction::UBTEventAction(UBTEventStore* store)
     : fStore(store)
 {
     auto* man = G4AnalysisManager::Instance();
 
-    man->CreateNtuple("Events", "Tracker hits — one row per event");
+    man->CreateNtuple("Events", "UBT hits — one row per event");
 
     // ---- tube branches ------------------------------------------------------
     man->CreateNtupleIColumn("tube_trackID",  fStore->tube_trackID);
@@ -36,13 +36,13 @@ TrackerEventAction::TrackerEventAction(TrackerEventStore* store)
     man->FinishNtuple();
 }
 
-void TrackerEventAction::BeginOfEventAction(const G4Event* event)
+void UBTEventAction::BeginOfEventAction(const G4Event* event)
 {
     fStore->clear();
-    G4cout << "\n=== Tracker Event " << event->GetEventID() << " ===" << G4endl;
+    G4cout << "\n=== UBT Event " << event->GetEventID() << " ===" << G4endl;
 }
 
-void TrackerEventAction::EndOfEventAction(const G4Event*)
+void UBTEventAction::EndOfEventAction(const G4Event*)
 {
     G4AnalysisManager::Instance()->AddNtupleRow();
 }

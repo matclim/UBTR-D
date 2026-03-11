@@ -1,12 +1,12 @@
-#include "TrackerRunAction.hh"
+#include "UBTRunAction.hh"
 #include "G4AnalysisManager.hh"
 #include "G4Run.hh"
 
-TrackerRunAction::TrackerRunAction(const std::string& outFile)
+UBTRunAction::UBTRunAction(const std::string& outFile)
     : fOutFileName(outFile)
 {}
 
-void TrackerRunAction::BeginOfRunAction(const G4Run*)
+void UBTRunAction::BeginOfRunAction(const G4Run*)
 {
     auto* man = G4AnalysisManager::Instance();
     man->SetDefaultFileType("root");
@@ -17,7 +17,7 @@ void TrackerRunAction::BeginOfRunAction(const G4Run*)
     man->OpenFile(base);
 }
 
-void TrackerRunAction::EndOfRunAction(const G4Run*)
+void UBTRunAction::EndOfRunAction(const G4Run*)
 {
     auto* man = G4AnalysisManager::Instance();
     man->Write();

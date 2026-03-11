@@ -1,14 +1,14 @@
 #pragma once
 #include "G4VUserDetectorConstruction.hh"
-#include "TrackerEventStore.hh"
+#include "UBTEventStore.hh"
 #include <string>
 
 class GeoPhysVol;
 
-class TrackerDetectorConstruction : public G4VUserDetectorConstruction {
+class UBTDetectorConstruction : public G4VUserDetectorConstruction {
 public:
-    explicit TrackerDetectorConstruction(bool writeGdml = false);
-    ~TrackerDetectorConstruction() override = default;
+    explicit UBTDetectorConstruction(bool writeGdml = false);
+    ~UBTDetectorConstruction() override = default;
 
     G4VPhysicalVolume* Construct() override;
 
@@ -16,13 +16,13 @@ public:
     void SetRegisterSD(bool on) { m_registerSD = on;   }
 
     // Access the shared event store (wired into EventAction at startup)
-    TrackerEventStore* GetStore() { return &m_store; }
+    UBTEventStore* GetStore() { return &m_store; }
 
 private:
     bool               m_writeGdml  = false;
     int                m_visMode    = 1;
     bool               m_registerSD = false;
-    TrackerEventStore  m_store;      // owned here, shared by ptr
+    UBTEventStore  m_store;      // owned here, shared by ptr
 
     GeoPhysVol* buildGeoModelWorld();
 };

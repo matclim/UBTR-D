@@ -1,26 +1,26 @@
 // ============================================================================
-//  Integration notes – how to add the tracker plane to DetectorConstruction
+//  Integration notes – how to add the ubt plane to DetectorConstruction
 // ============================================================================
 //
 //  1.  Add the two new source files to your build system:
-//          TrackerPlaneBuilder.cpp
-//          (paste MaterialManager_TrackerAdditions.cpp into MaterialManager.cpp)
+//          UBTPlaneBuilder.cpp
+//          (paste MaterialManager_UBTAdditions.cpp into MaterialManager.cpp)
 //
 //  2.  Add declarations to MaterialManager.h:
 //          GeoMaterial* mylar();
 //          GeoMaterial* arco2();
 //
 //  3.  In DetectorConstruction.cc, include the new builder:
-//          #include "TrackerPlaneBuilder.h"
+//          #include "UBTPlaneBuilder.h"
 //
 //  4.  In DetectorConstruction::buildGeoModelWorld(), after creating worldPhys,
 //      add a single call:
 //
-//          TrackerPlaneBuilder::build(worldPhys, MM,
+//          UBTPlaneBuilder::build(worldPhys, MM,
 //                                     /*zOffset_mm=*/ 0.0,
 //                                     /*tag=*/        "TRK");
 //
-//      The tracker plane will be placed centred at (0, 0, 0) in the world.
+//      The ubt plane will be placed centred at (0, 0, 0) in the world.
 //      Adjust zOffset_mm to position it along the beam axis as needed.
 //
 //  5.  Sensitive detector wiring (optional).
@@ -31,7 +31,7 @@
 //              lv->SetSensitiveDetector(caloSD); ++nSensitive;
 //          }
 //
-//      Or create a dedicated TrackerSD if you want separate hit collections.
+//      Or create a dedicated UBTSD if you want separate hit collections.
 //
 //  6.  World size.
 //      The plane is 3000 mm × 2000 mm × ~20 mm.
@@ -51,7 +51,7 @@
 //
 //     where p = 2r = 5 mm (tight packing).  The z-separation of 2r = 5 mm
 //     means the two sub-layers are just touching.  This is the standard
-//     "double layer" used in straw-tube trackers.  For a true staggered
+//     "double layer" used in straw-tube ubts.  For a true staggered
 //     honeycomb you would use z-separation = r*sqrt(3); adjust dzSub[] in
 //     placeDriftTubeLayer() if needed.
 //

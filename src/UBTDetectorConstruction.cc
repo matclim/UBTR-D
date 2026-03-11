@@ -1,5 +1,5 @@
-#include "TrackerDetectorConstruction.hh"
-#include "TrackerPlaneBuilder.h"
+#include "UBTDetectorConstruction.hh"
+#include "UBTPlaneBuilder.h"
 #include "MaterialManager.h"
 
 // GeoModel kernel
@@ -21,7 +21,7 @@
 #include "G4Colour.hh"
 #include "G4SystemOfUnits.hh"
 
-#include "TrackerSD.hh"
+#include "UBTSD.hh"
 #include "G4SDManager.hh"
 #include <set>
 
@@ -34,7 +34,7 @@ using namespace GeoModelKernelUnits;
 
 // ============================================================================
 
-TrackerDetectorConstruction::TrackerDetectorConstruction(bool writeGdml)
+UBTDetectorConstruction::UBTDetectorConstruction(bool writeGdml)
     : m_writeGdml(writeGdml)
 {}
 
@@ -42,9 +42,9 @@ TrackerDetectorConstruction::TrackerDetectorConstruction(bool writeGdml)
 //  buildGeoModelWorld
 //  Constructs a minimal GeoModel tree:
 //    World (air box, 4000 × 3000 × 500 mm)
-//      └─ TrackerPlane (built by TrackerPlaneBuilder)
+//      └─ UBTPlane (built by UBTPlaneBuilder)
 // ----------------------------------------------------------------------------
-GeoPhysVol* TrackerDetectorConstruction::buildGeoModelWorld()
+GeoPhysVol* UBTDetectorConstruction::buildGeoModelWorld()
 {
     MaterialManager MM;
 
@@ -54,13 +54,13 @@ GeoPhysVol* TrackerDetectorConstruction::buildGeoModelWorld()
     const double worldHalfZ =   100.0 * GeoModelKernelUnits::mm;   // stack is ±8 mm; 20 mm is generous
 
     auto* worldShape = new GeoBox(worldHalfX, worldHalfY, worldHalfZ);
-    auto* worldLog   = new GeoLogVol("TrackerWorldLog", worldShape, MM.air());
+    auto* worldLog   = new GeoLogVol("UBTWorldLog", worldShape, MM.air());
     auto* worldPhys  = new GeoPhysVol(worldLog);
 
-    // Place the tracker plane at z = 0 (centre of world)
-    TrackerPlaneBuilder::build(worldPhys, MM, /*zOffset_mm=*/0.0, /*tag=*/"TRK");
+    // Place the ubt plane at z = 0 (centre of world)
+    UBTPlaneBuilder::build(worldPhys, MM, /*zOffset_mm=*/0.0, /*tag=*/"TRK");
 
-    G4cout << "[TrackerDetectorConstruction] GeoModel world children = "
+    G4cout << "[UBTDetectorConstruction] GeoModel world children = "
            << worldPhys->getNChildVols() << G4endl;
 
     return worldPhys;
@@ -69,25 +69,25 @@ GeoPhysVol* TrackerDetectorConstruction::buildGeoModelWorld()
 // ----------------------------------------------------------------------------
 //  Construct  (called by Geant4 run manager)
 // ----------------------------------------------------------------------------
-G4VPhysicalVolume* TrackerDetectorConstruction::Construct()
+G4VPhysicalVolume* UBTDetectorConstruction::Construct()
 {
     // 1. Build GeoModel tree
     GeoPhysVol* geoWorld = buildGeoModelWorld();
 
     // 2. Convert to Geant4 via GeoModel2G4
-    ExtParameterisedVolumeBuilder vb("TrackerWorld");
+    ExtParameterisedVolumeBuilder vb("UBTWorld");
     G4LogicalVolume* g4WorldLV = vb.Build(static_cast<PVConstLink>(geoWorld));
 
     if (!g4WorldLV) {
-        G4Exception("TrackerDetectorConstruction::Construct",
+        G4Exception("UBTDetectorConstruction::Construct",
                     "Geo2G4BuildFailed", FatalException,
                     "ExtParameterisedVolumeBuilder::Build returned null LV.");
     }
 
     auto* pvWorld = new G4PVPlacement(nullptr, {}, g4WorldLV,
-                                      "TrackerWorldPV", nullptr, false, 0);
+                                      "UBTWorldPV", nullptr, false, 0);
 
-    G4cout << "[TrackerDetectorConstruction] G4 world daughters = "
+    G4cout << "[UBTDetectorConstruction] G4 world daughters = "
            << g4WorldLV->GetNoDaughters()
            << "  LVStore size = "
            << G4LogicalVolumeStore::GetInstance()->size() << G4endl;
@@ -95,23 +95,23 @@ G4VPhysicalVolume* TrackerDetectorConstruction::Construct()
     // 3. Sensitive detector registration
     if (m_registerSD) {
         auto* sdman = G4SDManager::GetSDMpointer();
-        auto* trackerSD = new TrackerSD("TrackerSD", &m_store);
-        sdman->AddNewDetector(trackerSD);
+        auto* ubtSD = new UBTSD("UBTSD", &m_store);
+        sdman->AddNewDetector(ubtSD);
 
         int nSD = 0;
         for (auto* lv : *G4LogicalVolumeStore::GetInstance()) {
             const std::string& n = lv->GetName();
             if (n.find("TubeGas_LV") != std::string::npos ||
                 n.find("Tile_LV")    != std::string::npos) {
-                lv->SetSensitiveDetector(trackerSD);
+                lv->SetSensitiveDetector(ubtSD);
                 ++nSD;
             }
         }
-        G4cout << "[TrackerDetectorConstruction] Sensitive LVs registered: "
+        G4cout << "[UBTDetectorConstruction] Sensitive LVs registered: "
                << nSD << G4endl;
 
         // Diagnostic: dump every unique LV name once
-        G4cout << "[TrackerDetectorConstruction] All unique LV names:" << G4endl;
+        G4cout << "[UBTDetectorConstruction] All unique LV names:" << G4endl;
         std::set<std::string> seen;
         for (auto* lv : *G4LogicalVolumeStore::GetInstance()) {
             const std::string& ln = lv->GetName();
@@ -148,7 +148,7 @@ G4VPhysicalVolume* TrackerDetectorConstruction::Construct()
     for (auto* lv : *store) {
         const std::string& n = lv->GetName();
 
-        if (n.find("TrackerWorldLog") != std::string::npos || n == "World") {
+        if (n.find("UBTWorldLog") != std::string::npos || n == "World") {
             lv->SetVisAttributes(visWorld);
         }
         // Region envelopes  (_LOG suffix added by makeEnvelope)
@@ -188,11 +188,11 @@ G4VPhysicalVolume* TrackerDetectorConstruction::Construct()
         G4AutoLock lock(&gdmlMutex);
         if (!gdmlWritten && G4Threading::IsMasterThread()) {
             const char* out     = std::getenv("G4_GDML_OUT");
-            std::string outName = out ? out : "tracker_geometry.gdml";
+            std::string outName = out ? out : "ubt_geometry.gdml";
             G4GDMLParser parser;
             parser.SetStripFlag(false);
             parser.Write(outName, pvWorld, /*storeReferences=*/true);
-            G4cout << "[TrackerDetectorConstruction] GDML written to: "
+            G4cout << "[UBTDetectorConstruction] GDML written to: "
                    << outName << G4endl;
             gdmlWritten = true;
         }

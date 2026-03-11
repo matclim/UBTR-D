@@ -5,9 +5,9 @@ class GeoVPhysVol;
 class MaterialManager;
 
 // ============================================================================
-//  TrackerPlaneBuilder
+//  UBTPlaneBuilder
 //
-//  Builds the 2×3 m² tracker plane into `mother` at z = zOffset_mm.
+//  Builds the 2×3 m² ubt plane into `mother` at z = zOffset_mm.
 //
 //  Regions (origin at plane centre):
 //    Outer top:     x=[-1000,+1000] mm,  y=[+200,+1500] mm  — drift tubes
@@ -20,7 +20,7 @@ class MaterialManager;
 //  Tiles: 1×1×1 cm³ polystyrene, 1600 per block (40×40 grid).
 //  All regions coplanar at z = zOffset_mm.
 // ============================================================================
-class TrackerPlaneBuilder {
+class UBTPlaneBuilder {
 public:
     static void build(GeoVPhysVol*     mother,
                       MaterialManager& MM,
