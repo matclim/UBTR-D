@@ -1,0 +1,62 @@
+# =============================================================================
+#  tracker_vis.mac
+#
+#  Geant4 visualisation macro for the 2×3 m² tracker plane.
+#
+#  Usage (from run_g4 --tracker-only --visualize):
+#      ./run_g4 --tracker-only --visualize --vis-macro tracker_vis.mac
+#
+#  Or interactively after launching with --visualize:
+#      /control/execute tracker_vis.mac
+# =============================================================================
+
+# ---- Initialise visualisation driver ----------------------------------------
+# Use the best available: Qt > OGL > VRML fallback
+/vis/open OGL 1200x800-0+0
+
+# ---- Scene setup -------------------------------------------------------------
+/vis/drawVolume
+
+# Use the world as scene root
+/vis/scene/add/volume TrackerWorldPV
+
+# ---- Viewpoint: slightly above and to the side for a 3D perspective ----------
+# Looking roughly along -Z with a tilt so the plane layout is visible
+/vis/viewer/set/viewpointThetaPhi 70 30
+/vis/viewer/set/upVector 0 1 0
+
+# Zoom out enough to see the full 3×2 m plane
+/vis/viewer/zoomTo 1.0
+/vis/viewer/set/targetPoint 0 0 0 mm
+
+# ---- Lighting ----------------------------------------------------------------
+/vis/viewer/set/background white
+/vis/viewer/set/globalLineWidthScale 1.5
+
+# ---- Axes (optional) ---------------------------------------------------------
+# Shows a 500 mm axis cross at the origin
+/vis/scene/add/axes 0 0 0 500 mm
+
+# ---- Update ------------------------------------------------------------------
+/vis/viewer/flush
+/vis/viewer/update
+
+# =============================================================================
+#  Useful interactive commands (paste into session as needed):
+#
+#  Rotate:
+#    /vis/viewer/set/viewpointThetaPhi 90 0     # face-on from +Z (beam view)
+#    /vis/viewer/set/viewpointThetaPhi 0  0     # top view
+#    /vis/viewer/set/viewpointThetaPhi 90 90    # side view
+#
+#  Zoom:
+#    /vis/viewer/zoomTo 2.0
+#    /vis/viewer/zoomTo 0.5
+#
+#  Toggle volume visibility:
+#    /vis/geometry/set/visibility TrackerWorldPV 0 false
+#
+#  Cutaway view (slice through z=0):
+#    /vis/viewer/set/sectionPlane on 0 0 0 mm 0 0 1
+#    /vis/viewer/set/sectionPlane off
+# =============================================================================
