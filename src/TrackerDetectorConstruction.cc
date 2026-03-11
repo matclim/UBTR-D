@@ -23,6 +23,7 @@
 
 #include "TrackerSD.hh"
 #include "G4SDManager.hh"
+#include <set>
 
 // GDML export
 #include "G4GDMLParser.hh"
@@ -50,7 +51,7 @@ GeoPhysVol* TrackerDetectorConstruction::buildGeoModelWorld()
     // World box — generous margins around the 3000×2000 mm plane
     const double worldHalfX = 1200.0 * GeoModelKernelUnits::mm;   // detector ±1000 mm in X + margin
     const double worldHalfY = 1700.0 * GeoModelKernelUnits::mm;   // detector ±1500 mm in Y + margin
-    const double worldHalfZ =   20.0 * GeoModelKernelUnits::mm;   // stack is ±8 mm; 20 mm is generous
+    const double worldHalfZ =   100.0 * GeoModelKernelUnits::mm;   // stack is ±8 mm; 20 mm is generous
 
     auto* worldShape = new GeoBox(worldHalfX, worldHalfY, worldHalfZ);
     auto* worldLog   = new GeoLogVol("TrackerWorldLog", worldShape, MM.air());
@@ -94,7 +95,7 @@ G4VPhysicalVolume* TrackerDetectorConstruction::Construct()
     // 3. Sensitive detector registration
     if (m_registerSD) {
         auto* sdman = G4SDManager::GetSDMpointer();
-        auto* trackerSD = new TrackerSD("TrackerSD");
+        auto* trackerSD = new TrackerSD("TrackerSD", &m_store);
         sdman->AddNewDetector(trackerSD);
 
         int nSD = 0;
@@ -108,6 +109,17 @@ G4VPhysicalVolume* TrackerDetectorConstruction::Construct()
         }
         G4cout << "[TrackerDetectorConstruction] Sensitive LVs registered: "
                << nSD << G4endl;
+
+        // Diagnostic: dump every unique LV name once
+        G4cout << "[TrackerDetectorConstruction] All unique LV names:" << G4endl;
+        std::set<std::string> seen;
+        for (auto* lv : *G4LogicalVolumeStore::GetInstance()) {
+            const std::string& ln = lv->GetName();
+            if (seen.insert(ln).second) {   // only print first occurrence
+                G4cout << (lv->GetSensitiveDetector() ? "  [SD]     " : "  [no SD]  ")
+                       << ln << G4endl;
+            }
+        }
     }
 
     // 4. Visualisation attributes

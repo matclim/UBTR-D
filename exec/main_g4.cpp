@@ -120,8 +120,9 @@ int main(int argc, char** argv)
     runManager->SetUserInitialization(factory.GetReferencePhysList("FTFP_BERT"));
 
     // User actions
+    // EventStore is owned by detCon; wire it into EventAction before Initialize()
     auto* runAction   = new TrackerRunAction(outFile);
-    auto* eventAction = new TrackerEventAction(runAction);
+    auto* eventAction = new TrackerEventAction(detCon->GetStore());
     runManager->SetUserAction(new TrackerPrimaryGeneratorAction(gun));
     runManager->SetUserAction(runAction);
     runManager->SetUserAction(eventAction);

@@ -1,101 +1,100 @@
 #include "TrackerSD.hh"
-#include "TrackerHit.hh"
+#include "TrackerEventStore.hh"
 
 #include "G4Step.hh"
 #include "G4StepPoint.hh"
 #include "G4Track.hh"
+#include "G4VPhysicalVolume.hh"
 #include "G4LogicalVolume.hh"
 #include "G4TouchableHandle.hh"
-#include "G4SDManager.hh"
 #include "G4SystemOfUnits.hh"
 
+#include <atomic>
+#include <mutex>
+#include <set>
 #include <regex>
+#include <sstream>
 
-TrackerSD::TrackerSD(const std::string& name)
-    : G4VSensitiveDetector(name)
+static std::atomic<bool> s_firstTube{true};
+static std::atomic<bool> s_firstTile{true};
+
+// ----------------------------------------------------------------------------
+//  Make a unique string key for a (trackID, volume instance) pair.
+//
+//  The problem: all tubes in a region share one GeoLogVol, so Geo2G4 gives
+//  every tube PV the SAME name (e.g. "TRK_CentralTubes_Wall_PV").
+//  The PV *pointer* is stable within one step but changes between steps of
+//  the same track in the same tube (Geant4 re-uses wrapper objects).
+//
+//  Solution: use the full touchable history path as the key.
+//  touch->GetHistoryDepth() levels of (volumeName, copyNo) pairs give a
+//  globally unique address for every placed volume in the hierarchy.
+// ----------------------------------------------------------------------------
+static std::string touchableKey(int trackID,
+                                const G4TouchableHandle& touch)
 {
-    collectionName.insert(TubeHCname());
-    collectionName.insert(TileHCname());
+    std::ostringstream oss;
+    oss << trackID << '|';
+    const int depth = touch->GetHistoryDepth();
+    for (int i = 0; i <= depth; ++i) {
+        oss << touch->GetVolume(i)->GetName()
+            << ':' << touch->GetCopyNumber(i) << '/';
+    }
+    return oss.str();
 }
 
-void TrackerSD::Initialize(G4HCofThisEvent* hce)
+TrackerSD::TrackerSD(const G4String& name, TrackerEventStore* store)
+    : G4VSensitiveDetector(name), fStore(store)
+{}
+
+void TrackerSD::Initialize(G4HCofThisEvent*)
 {
-    fTubeHC = new TubeHitsCollection(SensitiveDetectorName, TubeHCname());
-    fTileHC = new TileHitsCollection(SensitiveDetectorName, TileHCname());
-
-    if (fTubeHCID < 0)
-        fTubeHCID = G4SDManager::GetSDMpointer()->GetCollectionID(
-                        SensitiveDetectorName + "/" + TubeHCname());
-    if (fTileHCID < 0)
-        fTileHCID = G4SDManager::GetSDMpointer()->GetCollectionID(
-                        SensitiveDetectorName + "/" + TileHCname());
-
-    hce->AddHitsCollection(fTubeHCID, fTubeHC);
-    hce->AddHitsCollection(fTileHCID, fTileHC);
-
-    fTubeHitMap.clear();
-    fTileHitMap.clear();
+    fMap.clear();
+    s_firstTube = true;
+    s_firstTile = true;
 }
 
 G4bool TrackerSD::ProcessHits(G4Step* step, G4TouchableHistory*)
 {
-    const double edep = step->GetTotalEnergyDeposit();
-    if (edep <= 0.0) return false;
+    const G4StepPoint*   pre    = step->GetPreStepPoint();
+    const G4StepPoint*   post   = step->GetPostStepPoint();
+    G4VPhysicalVolume*   pv     = pre->GetPhysicalVolume();
+    if (!pv) return false;
 
-    const G4Track*         track   = step->GetTrack();
-    const int              trackID = track->GetTrackID();
-    const G4StepPoint*     pre     = step->GetPreStepPoint();
-    const G4StepPoint*     post    = step->GetPostStepPoint();
-    const G4TouchableHandle& touch  = pre->GetTouchableHandle();
-    const int              copyNo  = touch->GetCopyNumber();
-    const std::string      lvName  = pre->GetPhysicalVolume()
-                                         ->GetLogicalVolume()->GetName();
+    const double         edep   = step->GetTotalEnergyDeposit();
+    const std::string    lvName = pv->GetLogicalVolume()->GetName();
+    const G4TouchableHandle& touch = pre->GetTouchableHandle();
 
     // ----------------------------------------------------------------
     //  Tube gas hit
     // ----------------------------------------------------------------
     if (lvName.find("TubeGas_LV") != std::string::npos) {
 
-        const uint64_t key = (static_cast<uint64_t>(trackID) << 32)
-                           | static_cast<uint32_t>(copyNo);
+        const std::string key = touchableKey(step->GetTrack()->GetTrackID(), touch);
 
-        auto it = fTubeHitMap.find(key);
-        TubeHit* hit = nullptr;
-
-        if (it == fTubeHitMap.end()) {
-            // First step of this track in this gas volume → new hit
-            hit = new TubeHit();
-            hit->SetVolumeName(lvName);
-            hit->SetTrackID(trackID);
-            hit->SetEntryPoint(pre->GetPosition());
-
-            // Decode region from LV name for convenience
-            // e.g. "TRK_Top_Left_TubeGas_LV" → "Top_Left"
-            std::string region = lvName;
-            const auto p = region.find("TRK_");
-            if (p != std::string::npos) region = region.substr(p + 4);
-            const auto q = region.find("_TubeGas_LV");
-            if (q != std::string::npos) region = region.substr(0, q);
-            hit->SetRegion(region);
-
-            const int idx = static_cast<int>(fTubeHC->GetSize());
-            fTubeHC->insert(hit);
-            fTubeHitMap[key] = idx;
-        } else {
-            hit = static_cast<TubeHit*>(fTubeHC->GetHit(it->second));
+        if (s_firstTube.exchange(false)) {
+            G4cout << "[TrackerSD] First tube step:"
+                   << " LV="   << lvName
+                   << " PV="   << pv->GetName()
+                   << " key="  << key
+                   << " edep=" << edep/MeV << " MeV"
+                   << " depth=" << touch->GetHistoryDepth() << G4endl;
         }
 
-        hit->AddEdep(edep);
-        // Energy-weighted position update
-        const G4ThreeVector stepPos = pre->GetPosition()
-                                    + 0.5 * (post->GetPosition() - pre->GetPosition());
-        // Approximate centroid: store the midpoint of the last step weighted by edep
-        // (full weighted average would need to track running sum separately;
-        //  for typical single tracks the midpoint of all steps is adequate)
-        hit->SetPosition(stepPos);
-
-        // Update exit point every step so the last step's post-point is the exit
-        hit->SetExitPoint(post->GetPosition());
+        auto& agg = fMap[key];
+        if (!agg.hasEntry) {
+            agg.isTube   = true;
+            agg.trackID  = step->GetTrack()->GetTrackID();
+            agg.entry    = pre->GetPosition();
+            agg.hasEntry = true;
+            agg.region   = regionCode(lvName);
+        }
+        agg.exit_pt = post->GetPosition();
+        if (edep > 0.0) {
+            const G4ThreeVector mid = 0.5*(pre->GetPosition()+post->GetPosition());
+            agg.edep    += edep;
+            agg.sumEpos += edep * mid;
+        }
         return true;
     }
 
@@ -104,33 +103,25 @@ G4bool TrackerSD::ProcessHits(G4Step* step, G4TouchableHistory*)
     // ----------------------------------------------------------------
     if (lvName.find("Tile_LV") != std::string::npos) {
 
-        const uint64_t key = (static_cast<uint64_t>(trackID) << 32)
-                           | static_cast<uint32_t>(copyNo);
+        const std::string key = touchableKey(step->GetTrack()->GetTrackID(), touch);
 
-        auto it = fTileHitMap.find(key);
-        TileHit* hit = nullptr;
-
-        if (it == fTileHitMap.end()) {
-            hit = new TileHit();
-            hit->SetTrackID(trackID);
-            hit->SetPosition(pre->GetPosition());
-
-            // Decode tile ix, iy, sector from the physical volume name
-            const std::string pvName =
-                pre->GetPhysicalVolume()->GetName();
-            int ix = -1, iy = -1, sector = 0;
-            parseTileVolumeName(pvName, ix, iy, sector);
-            hit->SetTileIndex(ix, iy);
-            hit->SetSector(sector);
-
-            const int idx = static_cast<int>(fTileHC->GetSize());
-            fTileHC->insert(hit);
-            fTileHitMap[key] = idx;
-        } else {
-            hit = static_cast<TileHit*>(fTileHC->GetHit(it->second));
+        if (s_firstTile.exchange(false)) {
+            G4cout << "[TrackerSD] First tile step:"
+                   << " LV="   << lvName
+                   << " PV="   << pv->GetName()
+                   << " key="  << key
+                   << " edep=" << edep/MeV << " MeV" << G4endl;
         }
 
-        hit->AddEdep(edep);
+        auto& agg = fMap[key];
+        if (!agg.hasEntry) {
+            agg.isTile   = true;
+            agg.trackID  = step->GetTrack()->GetTrackID();
+            agg.firstPos = pre->GetPosition();
+            agg.hasEntry = true;
+            parseTilePVName(pv->GetName(), agg.tileX, agg.tileY, agg.sector);
+        }
+        if (edep > 0.0) agg.edep += edep;
         return true;
     }
 
@@ -139,27 +130,47 @@ G4bool TrackerSD::ProcessHits(G4Step* step, G4TouchableHistory*)
 
 void TrackerSD::EndOfEvent(G4HCofThisEvent*)
 {
-    // Nothing to flush — hits already in collection
+    int nTube = 0, nTile = 0;
+
+    for (const auto& [key, agg] : fMap) {
+        if (!agg.hasEntry) continue;
+
+        if (agg.isTube && agg.edep > 0.0) {
+            const G4ThreeVector pos = agg.sumEpos / agg.edep;
+            fStore->addTubeHit(agg.trackID, agg.edep,
+                               pos, agg.entry, agg.exit_pt, agg.region);
+            ++nTube;
+        }
+        else if (agg.isTile && agg.edep > 0.0) {
+            fStore->addTileHit(agg.trackID, agg.edep,
+                               agg.firstPos,
+                               agg.tileX, agg.tileY, agg.sector);
+            ++nTile;
+        }
+    }
+
+    G4cout << "[TrackerSD] EndOfEvent: tube hits=" << nTube
+           << "  tile hits=" << nTile
+           << "  map entries=" << fMap.size() << G4endl;
 }
 
-// ----------------------------------------------------------------------------
-//  parseTileVolumeName
-//
-//  Parses names of the form:
-//    TRK_TileLeft_T<ix>_<iy>_Wall   (sector = -1)
-//    TRK_TileRight_T<ix>_<iy>_Wall  (sector = +1)
-//
-//  Returns true if parsing succeeds.
-// ----------------------------------------------------------------------------
-bool TrackerSD::parseTileVolumeName(const std::string& name,
-                                    int& ix, int& iy, int& sector)
+int TrackerSD::regionCode(const std::string& lvName)
 {
-    // Determine sector from "TileLeft" / "TileRight"
-    if (name.find("TileLeft") != std::string::npos)       sector = -1;
+    if (lvName.find("CentralTubes") != std::string::npos) return 0;
+    if (lvName.find("Top_Left")     != std::string::npos) return 1;
+    if (lvName.find("Top_Right")    != std::string::npos) return 2;
+    if (lvName.find("Bottom_Left")  != std::string::npos) return 3;
+    if (lvName.find("Bottom_Right") != std::string::npos) return 4;
+    return -1;
+}
+
+bool TrackerSD::parseTilePVName(const std::string& name,
+                                int& ix, int& iy, int& sector)
+{
+    if      (name.find("TileLeft")  != std::string::npos) sector = -1;
     else if (name.find("TileRight") != std::string::npos) sector = +1;
     else { sector = 0; ix = iy = -1; return false; }
 
-    // Extract _T<ix>_<iy>
     static const std::regex re("_T(\\d+)_(\\d+)");
     std::smatch m;
     if (std::regex_search(name, m, re)) {

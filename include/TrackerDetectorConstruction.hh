@@ -1,6 +1,6 @@
 #pragma once
-
 #include "G4VUserDetectorConstruction.hh"
+#include "TrackerEventStore.hh"
 #include <string>
 
 class GeoPhysVol;
@@ -15,10 +15,14 @@ public:
     void SetVisMode(int mode)   { m_visMode    = mode; }
     void SetRegisterSD(bool on) { m_registerSD = on;   }
 
+    // Access the shared event store (wired into EventAction at startup)
+    TrackerEventStore* GetStore() { return &m_store; }
+
 private:
-    bool m_writeGdml  = false;
-    int  m_visMode    = 1;      // 0=envelopes only  1=by-region  2=full detail
-    bool m_registerSD = false;  // false for vis-only, true for simulation
+    bool               m_writeGdml  = false;
+    int                m_visMode    = 1;
+    bool               m_registerSD = false;
+    TrackerEventStore  m_store;      // owned here, shared by ptr
 
     GeoPhysVol* buildGeoModelWorld();
 };

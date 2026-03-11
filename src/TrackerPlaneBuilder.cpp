@@ -137,20 +137,26 @@ void placeSingleTubeSubLayer(GeoVPhysVol*  envelope,
         const std::string name =
             tag + "_S" + std::to_string(subIdx) + "_T" + std::to_string(i);
 
-        // --- Gas PV (solid cylinder, no extra transform — inherits wall orientation) ---
-        auto* gasPV = new GeoPhysVol(gasLog);
+        const GeoTrf::Transform3D tubeTrf =
+            GeoTrf::Translate3D(0.0, yPos, zLocal) * rotToX;
 
-        // --- Wall PV — gas is a daughter with identity transform ---
+        // Place wall and gas as SIBLINGS in the envelope (not nested).
+        // Nesting gas inside wall causes Geo2G4 to assign garbage copy numbers
+        // and Geant4's navigator cannot find the gas volume reliably.
+        // Both shapes are co-centred; the hollow wall [rInner,rOuter] and the
+        // solid gas [0,rInner] together fill the full tube cross-section.
+
+        // Wall
         auto* wallPV = new GeoPhysVol(wallLog);
-        wallPV->add(new GeoNameTag((name + "_Gas").c_str()));
-        wallPV->add(new GeoTransform(GeoTrf::Transform3D::Identity()));
-        wallPV->add(gasPV);
-
-        // --- Place wall in envelope: translate to (0, yPos, zLocal) then rotate ---
         envelope->add(new GeoNameTag((name + "_Wall").c_str()));
-        envelope->add(new GeoTransform(
-            GeoTrf::Translate3D(0.0, yPos, zLocal) * rotToX));
+        envelope->add(new GeoTransform(tubeTrf));
         envelope->add(wallPV);
+
+        // Gas — same transform, placed after wall so navigator prefers it
+        auto* gasPV = new GeoPhysVol(gasLog);
+        envelope->add(new GeoNameTag((name + "_Gas").c_str()));
+        envelope->add(new GeoTransform(tubeTrf));
+        envelope->add(gasPV);
     }
 }
 
@@ -184,9 +190,12 @@ void placeDoubleStaggeredLayer(GeoVPhysVol*       envelope,
         (tag + "_TubeWall_LV").c_str(),
         new GeoTube(rInner, rOuter, halfTubeLen),
         mylarMat);
+    // Gas radius is shrunk by 1 µm relative to wall inner radius to give
+    // Geant4's navigator a clean gap — avoids shared-surface ambiguity.
+    const double rGas = rInner - 0.001 * mm;
     auto* gasLog = new GeoLogVol(
         (tag + "_TubeGas_LV").c_str(),
-        new GeoTube(0.0, rInner, halfTubeLen),
+        new GeoTube(0.0, rGas, halfTubeLen),
         gasMat);
 
     // Sub-layer 0: z = zCenter - r,  yShift = 0
