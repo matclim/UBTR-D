@@ -1,0 +1,286 @@
+# TrackerGeoSim
+
+Geant4 simulation of a 2×3 m² tracking detector plane, built using the
+GeoModel geometry description toolkit.
+
+---
+
+## Detector layout
+
+```
+    Y
+    ^
+    +1500 ┌──────────────────────────────────────────┐
+          │  LEFT tubes  +  RIGHT tubes  (outer top)  │  y = [+200, +1500]
+    +200  ├───────────┬──────────────────┬────────────┤
+          │ PS tiles  │  central tubes   │  PS tiles  │  y = [-200, +200]
+          │ (left)    │  x = [-600,+600] │  (right)   │
+    -200  ├───────────┴──────────────────┴────────────┤
+          │  LEFT tubes  +  RIGHT tubes  (outer bot)  │  y = [-1500, -200]
+    -1500 └──────────────────────────────────────────┘
+          -1000  -600                  +600  +1000   --> X  (mm)
+```
+
+**Drift tubes** — mylar straws (5 mm diameter, 15 µm wall), ArCO2 70/30 fill,
+1.2 m long, running horizontally along X.  Each region uses a double-staggered
+layer (two sub-layers separated by one tube radius in Z and half a pitch in Y).
+
+The outer top and bottom bands each contain two independent half-planes:
+
+| Half-plane | X extent | Z centre |
+|---|---|---|
+| Left  | [−1000, +200] mm | −5 mm |
+| Right | [−200, +1000] mm | +5 mm |
+
+The overlap region x = [−200, +200] mm is covered by both half-planes.
+
+**Polystyrene tiles** — 1×1×1 cm³ tiles in two 400×400 mm blocks at
+x = [−1000, −600] mm (sector −1) and x = [+600, +1000] mm (sector +1),
+both in the y = [−200, +200] mm strip.
+
+---
+
+## Dependencies
+
+| Package | Minimum version | Notes |
+|---|---|---|
+| CMake | 3.16 | |
+| GCC / Clang | GCC 10 / Clang 11 | C++20 required |
+| Geant4 | 11.x | Built with `ui_all vis_all` |
+| GeoModelCore | 6.x | Provides `GeoModelKernel` |
+| GeoModelG4 | 6.x | Provides `GeoModel2G4` bridge |
+| ROOT | 6.x | `Core`, `RIO`, `Tree` components |
+
+---
+
+## Building
+
+```bash
+# From the project root
+mkdir build && cd build
+
+cmake .. \
+  -DCMAKE_PREFIX_PATH="/path/to/geant4;/path/to/geomodel;/path/to/root"
+
+make -j$(nproc)
+```
+
+If Geant4, GeoModel and ROOT are already on your `CMAKE_PREFIX_PATH` or sourced
+via their respective `thisgeant4.sh` / `thisroot.sh` setup scripts, the plain
+`cmake ..` is sufficient.
+
+After a successful build the binary is at:
+
+```
+build/run_tracker
+```
+
+The vis macro `tracker_vis.mac` is copied automatically into the build directory
+by CMake.
+
+---
+
+## Running
+
+### Geometry visualisation only
+
+Opens the interactive Geant4 viewer without simulating any particles.
+
+```bash
+./run_tracker --visualize
+```
+
+Control the level of detail with `--vis-mode`:
+
+| Mode | What is shown |
+|---|---|
+| `0` | Envelope outlines only (fastest) |
+| `1` | Colour-coded by region (default) |
+| `2` | Full detail — individual tube walls, gas volumes, tiles |
+
+```bash
+./run_tracker --visualize --vis-mode 2
+```
+
+Useful interactive commands inside the viewer:
+
+```
+# Face-on view from upstream (+Z direction)
+/vis/viewer/set/viewpointThetaPhi 90 0
+
+# Side view
+/vis/viewer/set/viewpointThetaPhi 90 90
+
+# Zoom
+/vis/viewer/zoomTo 2.0
+```
+
+### Export geometry to GDML
+
+```bash
+./run_tracker --write-gdml
+./run_tracker --write-gdml --gdml-out my_geometry.gdml
+```
+
+### Run a simulation
+
+```bash
+./run_tracker --n-events 1000
+```
+
+This fires 1000 events and writes hits to `tracker_hits.root` (default output
+file).  The SD is only registered when `--n-events` is greater than zero, so
+vis-only runs remain clean.
+
+### Full option reference
+
+```
+--n-events   <N>         Number of events to simulate      (default: 0)
+--output     <file>      ROOT output filename               (default: tracker_hits.root)
+--seed       <N>         Random seed (0 = Geant4 default)
+
+--particle   <name>      Geant4 particle name               (default: mu-)
+--energy-MeV <E>         Kinetic energy [MeV]               (default: 1000)
+--pos-mm     <x> <y> <z> Gun position [mm]                  (default: 0 0 -15)
+--dir        <x> <y> <z> Direction unit vector              (default: 0 0 1)
+--sigma-xy-mm <s>        Gaussian beam spread in X,Y [mm]  (default: 0)
+
+--visualize              Open interactive viewer
+--vis-mode   <0|1|2>     Visualisation detail level         (default: 1)
+--vis-macro  <file>      Geant4 vis macro to execute        (default: tracker_vis.mac)
+
+--write-gdml             Export geometry to GDML
+--gdml-out   <file>      GDML output filename               (default: tracker_geometry.gdml)
+```
+
+### Example commands
+
+```bash
+# 10 GeV muon along beam axis, 1000 events
+./run_tracker --n-events 1000 --particle mu- --energy-MeV 10000
+
+# 5 GeV pion with 2 mm beam spread, custom output file
+./run_tracker --n-events 500 --particle pi- --energy-MeV 5000 \
+              --sigma-xy-mm 2.0 --output pion_run.root
+
+# Electron from the side (along X), positioned upstream in X
+./run_tracker --n-events 100 --particle e- --energy-MeV 1000 \
+              --pos-mm -1100 0 0 --dir 1 0 0
+
+# Visualise and export GDML at the same time
+./run_tracker --visualize --write-gdml --vis-mode 1
+
+# Fixed seed for reproducible results
+./run_tracker --n-events 1000 --seed 42
+```
+
+---
+
+## Output file structure
+
+The ROOT file contains a single TTree named `Events` with one row per event.
+All branches are `std::vector<T>` — one element per hit within that event.
+Events with no hits produce a row with empty vectors.
+
+### Tube hit branches
+
+| Branch | Type | Description |
+|---|---|---|
+| `tube_trackID` | `vector<int>` | Geant4 track ID |
+| `tube_edep` | `vector<double>` | Energy deposit [MeV] |
+| `tube_x/y/z` | `vector<double>` | Hit position — centroid of steps [mm] |
+| `tube_x/y/z_entry` | `vector<double>` | Track entry point into gas volume [mm] |
+| `tube_x/y/z_exit` | `vector<double>` | Track exit point from gas volume [mm] |
+
+### Tile hit branches
+
+| Branch | Type | Description |
+|---|---|---|
+| `tile_trackID` | `vector<int>` | Geant4 track ID |
+| `tile_edep` | `vector<double>` | Energy deposit [MeV] |
+| `tile_tileX` | `vector<int>` | Tile column index (0 – 39) |
+| `tile_tileY` | `vector<int>` | Tile row index (0 – 39) |
+| `tile_sector` | `vector<int>` | −1 = left block, +1 = right block |
+| `tile_x/y/z` | `vector<double>` | Hit position [mm] |
+
+### Reading the output — PyROOT example
+
+```python
+import uproot
+
+with uproot.open("tracker_hits.root") as f:
+    tree = f["Events"]
+
+    for batch in tree.iterate(step_size=100):
+        # tube hits
+        for edep, x, y, z in zip(batch["tube_edep"],
+                                   batch["tube_x"],
+                                   batch["tube_y"],
+                                   batch["tube_z"]):
+            # each of these is an awkward array over one event
+            print("tube edep:", edep, "MeV  at x=", x, "y=", y, "z=", z)
+
+        # tile hits
+        for edep, tx, ty, sec in zip(batch["tile_edep"],
+                                      batch["tile_tileX"],
+                                      batch["tile_tileY"],
+                                      batch["tile_sector"]):
+            print("tile edep:", edep, "MeV  tile=(", tx, ",", ty,
+                  ")  sector=", sec)
+```
+
+### Reading the output — ROOT macro example
+
+```cpp
+void read_hits(const char* fname = "tracker_hits.root") {
+    TFile* f = TFile::Open(fname);
+    TTree* t = f->Get<TTree>("Events");
+
+    std::vector<double>* tube_edep = nullptr;
+    std::vector<double>* tube_x    = nullptr;
+    std::vector<int>*    tile_sector = nullptr;
+    std::vector<double>* tile_edep   = nullptr;
+
+    t->SetBranchAddress("tube_edep",   &tube_edep);
+    t->SetBranchAddress("tube_x",      &tube_x);
+    t->SetBranchAddress("tile_sector", &tile_sector);
+    t->SetBranchAddress("tile_edep",   &tile_edep);
+
+    for (Long64_t ev = 0; ev < t->GetEntries(); ++ev) {
+        t->GetEntry(ev);
+        std::cout << "Event " << ev
+                  << "  tube hits: " << tube_edep->size()
+                  << "  tile hits: " << tile_edep->size() << "\n";
+    }
+}
+```
+
+---
+
+## Project file layout
+
+```
+.
+├── CMakeLists.txt
+├── macros/
+│   └── tracker_vis.mac              Geant4 visualisation macro
+├── exec/
+│   └── main_g4.cpp                  Entry point, CLI parsing
+├── include/
+│   ├── MaterialManager.h            Material definitions
+│   ├── TrackerPlaneBuilder.h        Geometry builder interface
+│   ├── TrackerDetectorConstruction.hh
+│   ├── TrackerHit.hh                TubeHit and TileHit classes
+│   ├── TrackerSD.hh                 Sensitive detector
+│   ├── TrackerRunAction.hh          ROOT file + TTree ownership
+│   ├── TrackerEventAction.hh        Per-event hit collection and Fill()
+│   └── TrackerPrimaryGeneratorAction.hh
+└── src/
+    ├── MaterialManager.cpp
+    ├── TrackerPlaneBuilder.cpp      Full detector geometry
+    ├── TrackerDetectorConstruction.cc
+    ├── TrackerSD.cc
+    ├── TrackerRunAction.cc
+    ├── TrackerEventAction.cc
+    └── TrackerPrimaryGeneratorAction.cc
+```

@@ -1,14 +1,31 @@
 #pragma once
 #include "G4UserRunAction.hh"
 #include <string>
+#include <vector>
 
 class TFile;
 class TTree;
 
 // ============================================================================
 //  TrackerRunAction
-//  Opens the ROOT file, owns the two TTrees and their branch variables.
-//  TrackerEventAction fills the variables and calls Fill() each event.
+//
+//  One TTree, one row per event.
+//  Every branch is a std::vector; vectors are cleared at BeginOfEvent and
+//  filled by TrackerEventAction before the single Fill() call at EndOfEvent.
+//
+//  Tube branches  (one entry per tube hit = one track crossing one gas volume):
+//    tube_trackID              : Geant4 track ID
+//    tube_edep                 : total energy deposit in that gas volume [MeV]
+//    tube_x/y/z                : global position of last step midpoint [mm]
+//    tube_x/y/z_entry          : track entry point into the gas volume [mm]
+//    tube_x/y/z_exit           : track exit  point from the gas volume [mm]
+//
+//  Tile branches  (one entry per tile hit = one track crossing one tile):
+//    tile_trackID              : Geant4 track ID
+//    tile_edep                 : total energy deposit [MeV]
+//    tile_tileX / tile_tileY   : tile grid indices (0-39)
+//    tile_sector               : -1 = left block, +1 = right block
+//    tile_x/y/z                : global hit position [mm]
 // ============================================================================
 class TrackerRunAction : public G4UserRunAction {
 public:
@@ -18,28 +35,27 @@ public:
     void BeginOfRunAction(const G4Run*) override;
     void EndOfRunAction(const G4Run*)   override;
 
-    TTree* GetTubeTree() const { return fTubeTree; }
-    TTree* GetTileTree() const { return fTileTree; }
+    TTree* GetTree() const { return fTree; }
 
-    // ---- Tube branch variables (filled by TrackerEventAction) ----
-    int    t_eventID  = 0;
-    int    t_trackID  = 0;
-    double t_edep     = 0.;
-    double t_x        = 0., t_y     = 0., t_z     = 0.;
-    double t_x_entry  = 0., t_y_entry = 0., t_z_entry = 0.;
-    double t_x_exit   = 0., t_y_exit  = 0., t_z_exit  = 0.;
+    // ---- Tube hit vectors ---------------------------------------------------
+    std::vector<int>    tube_trackID;
+    std::vector<double> tube_edep;
+    std::vector<double> tube_x,       tube_y,       tube_z;
+    std::vector<double> tube_x_entry, tube_y_entry, tube_z_entry;
+    std::vector<double> tube_x_exit,  tube_y_exit,  tube_z_exit;
 
-    // ---- Tile branch variables (filled by TrackerEventAction) ----
-    int    p_eventID  = 0;
-    int    p_trackID  = 0;
-    double p_edep     = 0.;
-    int    p_tileX    = 0,  p_tileY  = 0;
-    int    p_sector   = 0;
-    double p_x        = 0., p_y      = 0., p_z = 0.;
+    // ---- Tile hit vectors ---------------------------------------------------
+    std::vector<int>    tile_trackID;
+    std::vector<double> tile_edep;
+    std::vector<int>    tile_tileX,   tile_tileY;
+    std::vector<int>    tile_sector;
+    std::vector<double> tile_x,       tile_y,       tile_z;
+
+    // Clears all vectors — called by TrackerEventAction::BeginOfEventAction
+    void ClearVectors();
 
 private:
     std::string fOutFileName;
-    TFile*      fRootFile  = nullptr;
-    TTree*      fTubeTree  = nullptr;
-    TTree*      fTileTree  = nullptr;
+    TFile*      fRootFile = nullptr;
+    TTree*      fTree     = nullptr;
 };

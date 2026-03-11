@@ -14,7 +14,10 @@ TrackerEventAction::TrackerEventAction(TrackerRunAction* ra)
     : fRunAction(ra)
 {}
 
-void TrackerEventAction::BeginOfEventAction(const G4Event*) {}
+void TrackerEventAction::BeginOfEventAction(const G4Event*)
+{
+    fRunAction->ClearVectors();
+}
 
 void TrackerEventAction::EndOfEventAction(const G4Event* event)
 {
@@ -30,60 +33,54 @@ void TrackerEventAction::EndOfEventAction(const G4Event* event)
     G4HCofThisEvent* hce = event->GetHCofThisEvent();
     if (!hce) return;
 
-    const int evtID = event->GetEventID();
-
     // ------------------------------------------------------------------
-    //  Tube hits
+    //  Push tube hits into vectors
     // ------------------------------------------------------------------
-    TTree* tubeTree = fRunAction->GetTubeTree();
-    if (tubeTree && fTubeHCID >= 0) {
+    if (fTubeHCID >= 0) {
         auto* tubeHC = dynamic_cast<TubeHitsCollection*>(hce->GetHC(fTubeHCID));
         if (tubeHC) {
             const int n = static_cast<int>(tubeHC->GetSize());
             for (int i = 0; i < n; ++i) {
                 TubeHit* h = static_cast<TubeHit*>(tubeHC->GetHit(i));
 
-                fRunAction->t_eventID  = evtID;
-                fRunAction->t_trackID  = h->GetTrackID();
-                fRunAction->t_edep     = h->GetEdep()          / MeV;
-                fRunAction->t_x        = h->GetPosition().x()  / mm;
-                fRunAction->t_y        = h->GetPosition().y()  / mm;
-                fRunAction->t_z        = h->GetPosition().z()  / mm;
-                fRunAction->t_x_entry  = h->GetEntry().x()     / mm;
-                fRunAction->t_y_entry  = h->GetEntry().y()     / mm;
-                fRunAction->t_z_entry  = h->GetEntry().z()     / mm;
-                fRunAction->t_x_exit   = h->GetExit().x()      / mm;
-                fRunAction->t_y_exit   = h->GetExit().y()      / mm;
-                fRunAction->t_z_exit   = h->GetExit().z()      / mm;
-
-                tubeTree->Fill();
+                fRunAction->tube_trackID .push_back(h->GetTrackID());
+                fRunAction->tube_edep    .push_back(h->GetEdep()         / MeV);
+                fRunAction->tube_x       .push_back(h->GetPosition().x() / mm);
+                fRunAction->tube_y       .push_back(h->GetPosition().y() / mm);
+                fRunAction->tube_z       .push_back(h->GetPosition().z() / mm);
+                fRunAction->tube_x_entry .push_back(h->GetEntry().x()    / mm);
+                fRunAction->tube_y_entry .push_back(h->GetEntry().y()    / mm);
+                fRunAction->tube_z_entry .push_back(h->GetEntry().z()    / mm);
+                fRunAction->tube_x_exit  .push_back(h->GetExit().x()     / mm);
+                fRunAction->tube_y_exit  .push_back(h->GetExit().y()     / mm);
+                fRunAction->tube_z_exit  .push_back(h->GetExit().z()     / mm);
             }
         }
     }
 
     // ------------------------------------------------------------------
-    //  Tile hits
+    //  Push tile hits into vectors
     // ------------------------------------------------------------------
-    TTree* tileTree = fRunAction->GetTileTree();
-    if (tileTree && fTileHCID >= 0) {
+    if (fTileHCID >= 0) {
         auto* tileHC = dynamic_cast<TileHitsCollection*>(hce->GetHC(fTileHCID));
         if (tileHC) {
             const int n = static_cast<int>(tileHC->GetSize());
             for (int i = 0; i < n; ++i) {
                 TileHit* h = static_cast<TileHit*>(tileHC->GetHit(i));
 
-                fRunAction->p_eventID  = evtID;
-                fRunAction->p_trackID  = h->GetTrackID();
-                fRunAction->p_edep     = h->GetEdep()          / MeV;
-                fRunAction->p_tileX    = h->GetTileX();
-                fRunAction->p_tileY    = h->GetTileY();
-                fRunAction->p_sector   = h->GetSector();
-                fRunAction->p_x        = h->GetPosition().x()  / mm;
-                fRunAction->p_y        = h->GetPosition().y()  / mm;
-                fRunAction->p_z        = h->GetPosition().z()  / mm;
-
-                tileTree->Fill();
+                fRunAction->tile_trackID .push_back(h->GetTrackID());
+                fRunAction->tile_edep    .push_back(h->GetEdep()         / MeV);
+                fRunAction->tile_tileX   .push_back(h->GetTileX());
+                fRunAction->tile_tileY   .push_back(h->GetTileY());
+                fRunAction->tile_sector  .push_back(h->GetSector());
+                fRunAction->tile_x       .push_back(h->GetPosition().x() / mm);
+                fRunAction->tile_y       .push_back(h->GetPosition().y() / mm);
+                fRunAction->tile_z       .push_back(h->GetPosition().z() / mm);
             }
         }
     }
+
+    // One row per event — fill after all hits are pushed
+    if (fRunAction->GetTree())
+        fRunAction->GetTree()->Fill();
 }
