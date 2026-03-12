@@ -101,7 +101,11 @@ G4bool UBTSD::ProcessHits(G4Step* step, G4TouchableHistory*)
     // ----------------------------------------------------------------
     //  Tile hit
     // ----------------------------------------------------------------
-    if (lvName.find("Tile_LV") != std::string::npos) {
+    // Tile LV names are now unique per tile (e.g. TRK_TileLeft_T20_20_LV),
+    // so match on the PV name which reliably contains "TileLeft" or "TileRight".
+    const std::string pvName = pv->GetName();
+    if (pvName.find("TileLeft")  != std::string::npos ||
+        pvName.find("TileRight") != std::string::npos) {
 
         const std::string key = touchableKey(step->GetTrack()->GetTrackID(), touch);
 

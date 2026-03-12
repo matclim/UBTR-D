@@ -1,7 +1,7 @@
 // ============================================================================
 //  UBTPlaneBuilder.cpp
 //
-//  2×3 m² ubt plane. All coordinates in mm; origin at plane centre.
+//  2×3 m² tracker plane. All coordinates in mm; origin at plane centre.
 //
 //  Layout (view along +Z / beam):
 //
@@ -48,6 +48,7 @@
 #include "GeoModelKernel/GeoNameTag.h"
 #include "GeoModelKernel/GeoTransform.h"
 #include "GeoModelKernel/Units.h"
+#include "GeoModelKernel/GeoFullPhysVol.h"
 
 #include <string>
 #include <cmath>
@@ -368,26 +369,31 @@ void UBTPlaneBuilder::build(GeoVPhysVol*      mother,
     const int nTileY = static_cast<int>(
         std::round(2.0 * tileBlockHalfY_mm / tileSide_mm));  // 40
 
-    // One shared tile LV — many PVs
-    auto* tileLV = new GeoLogVol(
-        (tag + "_Tile_LV").c_str(),
-        new GeoBox(0.5 * tileSide_mm * mm,
-                   0.5 * tileSide_mm * mm,
-                   tileHalfZ),
-        psMat);
+    // Each tile gets its own uniquely-named LV to prevent Geo2G4 from
+    // collapsing all instances into copy number 16969 (shared-LV bug).
+    // GeoFullPhysVol is used so the SD can register it as sensitive.
+    // Shrink tile by 5 µm per side to leave a gap between adjacent tiles.
+    // Zero-gap touching faces confuse Geant4's navigator (GeomNav1002).
+    const double tileGap = 0.005 * mm;
+    auto* tileShape = new GeoBox(0.5 * tileSide_mm * mm - tileGap,
+                                 0.5 * tileSide_mm * mm - tileGap,
+                                 tileHalfZ - tileGap);
 
     auto placeTileBlock = [&](GeoVPhysVol* env, const std::string& btag) {
         const double x0 = -0.5 * (nTileX - 1) * tileSide_mm * mm;
         const double y0 = -0.5 * (nTileY - 1) * tileSide_mm * mm;
         for (int ix = 0; ix < nTileX; ++ix) {
             for (int iy = 0; iy < nTileY; ++iy) {
-                env->add(new GeoNameTag(
-                    (btag+"_T"+std::to_string(ix)+"_"+std::to_string(iy)).c_str()));
+                const std::string tname =
+                    btag + "_T" + std::to_string(ix) + "_" + std::to_string(iy);
+                // Unique LV name per tile → unique copy number from Geo2G4
+                auto* lv = new GeoLogVol((tname + "_LV").c_str(), tileShape, psMat);
+                env->add(new GeoNameTag(tname.c_str()));
                 env->add(new GeoTransform(GeoTrf::Translate3D(
                     x0 + ix * tileSide_mm * mm,
                     y0 + iy * tileSide_mm * mm,
                     0.0)));
-                env->add(new GeoPhysVol(tileLV));
+                env->add(new GeoFullPhysVol(lv));
             }
         }
     };
