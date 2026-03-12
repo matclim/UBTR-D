@@ -1,6 +1,6 @@
 # TrackerGeoSim
 
-Geant4 simulation of a 2×3 m² UBT detector plane, built using the
+Geant4 simulation of a 2×3 m² tracking detector plane, built using the
 GeoModel geometry description toolkit.
 
 ---
@@ -72,10 +72,10 @@ via their respective `thisgeant4.sh` / `thisroot.sh` setup scripts, the plain
 After a successful build the binary is at:
 
 ```
-build/run_UBT
+build/run_tracker
 ```
 
-The vis macro `UBT_vis.mac` is copied automatically into the build directory
+The vis macro `tracker_vis.mac` is copied automatically into the build directory
 by CMake.
 
 ---
@@ -87,7 +87,7 @@ by CMake.
 Opens the interactive Geant4 viewer without simulating any particles.
 
 ```bash
-./run_UBT --visualize
+./run_tracker --visualize
 ```
 
 Control the level of detail with `--vis-mode`:
@@ -99,7 +99,7 @@ Control the level of detail with `--vis-mode`:
 | `2` | Full detail — individual tube walls, gas volumes, tiles |
 
 ```bash
-./run_UBT --visualize --vis-mode 2
+./run_tracker --visualize --vis-mode 2
 ```
 
 Useful interactive commands inside the viewer:
@@ -118,17 +118,17 @@ Useful interactive commands inside the viewer:
 ### Export geometry to GDML
 
 ```bash
-./run_UBT --write-gdml
-./run_UBT --write-gdml --gdml-out my_geometry.gdml
+./run_tracker --write-gdml
+./run_tracker --write-gdml --gdml-out my_geometry.gdml
 ```
 
 ### Run a simulation
 
 ```bash
-./run_UBT --n-events 1000
+./run_tracker --n-events 1000
 ```
 
-This fires 1000 events and writes hits to `UBT_hits.root` (default output
+This fires 1000 events and writes hits to `tracker_hits.root` (default output
 file).  The SD is only registered when `--n-events` is greater than zero, so
 vis-only runs remain clean.
 
@@ -136,7 +136,7 @@ vis-only runs remain clean.
 
 ```
 --n-events   <N>         Number of events to simulate      (default: 0)
---output     <file>      ROOT output filename               (default: UBT_hits.root)
+--output     <file>      ROOT output filename               (default: tracker_hits.root)
 --seed       <N>         Random seed (0 = Geant4 default)
 
 --particle   <name>      Geant4 particle name               (default: mu-)
@@ -147,31 +147,31 @@ vis-only runs remain clean.
 
 --visualize              Open interactive viewer
 --vis-mode   <0|1|2>     Visualisation detail level         (default: 1)
---vis-macro  <file>      Geant4 vis macro to execute        (default: UBT_vis.mac)
+--vis-macro  <file>      Geant4 vis macro to execute        (default: tracker_vis.mac)
 
 --write-gdml             Export geometry to GDML
---gdml-out   <file>      GDML output filename               (default: UBT_geometry.gdml)
+--gdml-out   <file>      GDML output filename               (default: tracker_geometry.gdml)
 ```
 
 ### Example commands
 
 ```bash
 # 10 GeV muon along beam axis, 1000 events
-./run_UBT --n-events 1000 --particle mu- --energy-MeV 10000
+./run_tracker --n-events 1000 --particle mu- --energy-MeV 10000
 
 # 5 GeV pion with 2 mm beam spread, custom output file
-./run_UBT --n-events 500 --particle pi- --energy-MeV 5000 \
+./run_tracker --n-events 500 --particle pi- --energy-MeV 5000 \
               --sigma-xy-mm 2.0 --output pion_run.root
 
 # Electron from the side (along X), positioned upstream in X
-./run_UBT --n-events 100 --particle e- --energy-MeV 1000 \
+./run_tracker --n-events 100 --particle e- --energy-MeV 1000 \
               --pos-mm -1100 0 0 --dir 1 0 0
 
 # Visualise and export GDML at the same time
-./run_UBT --visualize --write-gdml --vis-mode 1
+./run_tracker --visualize --write-gdml --vis-mode 1
 
 # Fixed seed for reproducible results
-./run_UBT --n-events 1000 --seed 42
+./run_tracker --n-events 1000 --seed 42
 ```
 
 ---
@@ -208,7 +208,7 @@ Events with no hits produce a row with empty vectors.
 ```python
 import uproot
 
-with uproot.open("UBT_hits.root") as f:
+with uproot.open("tracker_hits.root") as f:
     tree = f["Events"]
 
     for batch in tree.iterate(step_size=100):
@@ -232,7 +232,7 @@ with uproot.open("UBT_hits.root") as f:
 ### Reading the output — ROOT macro example
 
 ```cpp
-void read_hits(const char* fname = "UBT_hits.root") {
+void read_hits(const char* fname = "tracker_hits.root") {
     TFile* f = TFile::Open(fname);
     TTree* t = f->Get<TTree>("Events");
 
@@ -263,7 +263,7 @@ void read_hits(const char* fname = "UBT_hits.root") {
 .
 ├── CMakeLists.txt
 ├── macros/
-│   └── UBT_vis.mac              Geant4 visualisation macro
+│   └── tracker_vis.mac              Geant4 visualisation macro
 ├── exec/
 │   └── main_g4.cpp                  Entry point, CLI parsing
 ├── include/
