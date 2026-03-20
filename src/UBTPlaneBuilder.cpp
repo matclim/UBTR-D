@@ -398,11 +398,15 @@ void UBTPlaneBuilder::build(GeoVPhysVol*      mother,
         }
     };
 
+    // Envelope gets 0.1 mm margin in Z so tiles don't touch the envelope face
+    // (touching faces cause GeomNav1002 stuck-track warnings).
+    const double tileEnvHalfZ = tileHalfZ + 0.1 * mm;
+
     // ---- Left tile block  x=[-1000,-600] ----
     {
         auto* env = makeEnvelope(mother, airMat,
                                  tag + "_TileLeft",
-                                 tileBlockHalfX, tileBlockHalfY, tileHalfZ,
+                                 tileBlockHalfX, tileBlockHalfY, tileEnvHalfZ,
                                  -tileBlockCtrX_mm * mm, 0.0, zOff);
         placeTileBlock(env, tag + "_TileLeft");
     }
@@ -411,7 +415,7 @@ void UBTPlaneBuilder::build(GeoVPhysVol*      mother,
     {
         auto* env = makeEnvelope(mother, airMat,
                                  tag + "_TileRight",
-                                 tileBlockHalfX, tileBlockHalfY, tileHalfZ,
+                                 tileBlockHalfX, tileBlockHalfY, tileEnvHalfZ,
                                  +tileBlockCtrX_mm * mm, 0.0, zOff);
         placeTileBlock(env, tag + "_TileRight");
     }
